@@ -1,0 +1,18 @@
+# PDD Cache and state
+.pdd/
+
+# Node.js
+node_modules/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

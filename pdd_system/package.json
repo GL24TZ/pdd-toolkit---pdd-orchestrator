@@ -1,0 +1,11 @@
+{
+    "name": "pdd-toolkit",
+    "version": "1.0.0",
+    "description": "Multi-language code analysis toolkit for AI agents",
+    "main": "pdd.js",
+    "type": "commonjs",
+    "scripts": {
+        "start": "node pdd.js",
+        "mcp": "node mcp-server.js"
+    }
+}
