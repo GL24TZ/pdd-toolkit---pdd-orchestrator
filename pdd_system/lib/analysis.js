@@ -3,22 +3,33 @@
 // ============================================================
 
 function findPaths(graph, from, to, maxDepth = 25) {
+    // Build adjacency list once
+    const adj = new Map();
+    for (const c of graph.calls) {
+        if (!adj.has(c.from)) adj.set(c.from, []);
+        adj.get(c.from).push(c.to);
+    }
+
     const paths = [];
     const visited = new Set();
+    
     function dfs(current, path) {
         if (path.length > maxDepth) return;
         if (current === to) { paths.push([...path]); return; }
-        const edges = graph.calls.filter(c => c.from === current);
+        
+        const neighbors = adj.get(current) || [];
         const seen = new Set();
-        for (const e of edges) {
-            if (seen.has(e.to) || visited.has(e.to)) continue;
-            seen.add(e.to); visited.add(e.to);
-            path.push(e.to); dfs(e.to, path); path.pop();
-            visited.delete(e.to);
+        for (const nxt of neighbors) {
+            if (seen.has(nxt) || visited.has(nxt)) continue;
+            seen.add(nxt); visited.add(nxt);
+            path.push(nxt); dfs(nxt, path); path.pop();
+            visited.delete(nxt);
         }
     }
+    
     if (!graph.functions[from]) return [];
-    visited.add(from); dfs(from, [from]);
+    visited.add(from);
+    dfs(from, [from]);
     return paths;
 }
 

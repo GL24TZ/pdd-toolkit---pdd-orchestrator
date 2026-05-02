@@ -129,7 +129,12 @@ function scan(rootPath) {
         const parser = PARSERS[family];
 
         if (parser && parser.extractFunctions) {
-            const text = fs.readFileSync(full, 'utf-8');
+            let text;
+            try {
+                text = fs.readFileSync(full, 'utf-8');
+            } catch (e) {
+                continue;
+            }
             const clean = parser.strip(text);
             const funcs = parser.extractFunctions(text, rel);
             const ranges = funcs.map(f => [f.bodyStart, f.bodyEnd]);
