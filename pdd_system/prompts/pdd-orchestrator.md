@@ -73,6 +73,7 @@ Track at least:
 - `input_target`
 - `normalized_target`
 - `mode`
+- `confidence`
 - `investigation_dir`
 - `current_phase`
 - `phase_status` map
@@ -90,6 +91,7 @@ When creating `INVESTIGATION_STATE.json` for the first time, `artifacts` MUST be
   "input_target": "...",
   "normalized_target": "...",
   "mode": "auto",
+  "confidence": "standard",
   "investigation_dir": "...",
   "current_phase": "scope",
   "phase_status": {
@@ -193,35 +195,36 @@ Create all artifacts inside {investigation_dir}/testing/.
 Save execution evidence as {investigation_dir}/testing/test_evidence.txt with exact command, output, and exit code.
 ```
 
-## [NUEVO] STRICT VALIDATION PROTOCOL (Dual Validator)
+## [NUEVO] STRICT VALIDATION PROTOCOL (Lazy Redundancy)
 
 Use this INSTEAD of standard Validation when `mode == strict`.
 
 ### Phase 4a: Parallel Blind Reproduction
 Launch TWO `pdd-validator` agents via `delegate` (async, parallel):
-- **Validator A**: Receives Template B + Diagnosis.md. Must create `test_fail_A.*` + `test_evidence_A.txt`.
-- **Validator B**: Receives Template B + Diagnosis.md. Must create `test_fail_B.*` + `test_evidence_B.txt`.
+- **Validator A**: Receives Template B. Must isolate to `{investigation_dir}/testing/attempt_A/`.
+- **Validator B**: Receives Template B. Must isolate to `{investigation_dir}/testing/attempt_B/`.
 
 NEITHER validator knows about the other.
 
-### Phase 4b: Verdict Synthesis (Orchestrator duty)
-After both `delegation_read` calls return, compare:
+### Phase 4b: Verdict Synthesis & Lazy Recovery
+After `delegation_read` calls return, compare:
 
-| Result A | Result B | Confidence | Action |
-|----------|----------|------------|--------|
-| PROVEN | PROVEN | 95% | Advance to Formalization. Merge evidence. |
-| PROVEN | FALSIFIED | Contradiction | STOP. Report: "Inconsistent reproduction. Diagnosis may be incomplete." Do NOT advance. |
-| FALSIFIED | FALSIFIED | 90% | STOP. Label issue `PDD-INVALID`. Stop pipeline. |
-| BLOCKED | ANY | Low | Retry once per validator. If still blocked, report `PDD-UNCERTAIN`. |
+| Result A | Result B | Action |
+|----------|----------|--------|
+| PROVEN | PROVEN | Advance to Formalization. Update state `"confidence": "dual-proven"`. |
+| PROVEN | FALSIFIED | STOP. Report: "Contradiction." Do NOT advance. |
+| FALSIFIED| FALSIFIED| STOP. Label issue `PDD-INVALID`. Stop pipeline. |
+| PROVEN | TIMEOUT/BLOCKED | **VALIDATION_STALL**. Update JSON `phase_status.validation = "stalled_infra"`. Freeze pipeline. |
+| TIMEOUT | TIMEOUT | **VALIDATION_STALL**. Update JSON `phase_status.validation = "stalled_infra"`. Freeze pipeline. |
 
-### Phase 4c: Evidence Merge (if PROVEN/PROVEN)
-Both evidences must be consistent:
-- Same root cause function mentioned.
-- Similar exit code or crash signature.
-- If one used ASan and the other pure execution, both must fail.
+If `VALIDATION_STALL` is triggered, the pipeline STOPS. Do NOT advance. Wait for user commands:
+1. If user runs `/pdd-retry-validation`: Launch a replacement validator (e.g. Validator C) in a new isolated folder (`attempt_C`). Evaluate new pair (e.g. A + C).
+2. If user runs `/pdd-degrade`: Force advance. Update JSON `mode = "strict-degraded"`, `confidence = "single-source"`. Proceed to Formalization.
 
-Save merged evidence as `test_evidence.txt` referencing both A and B.
-Set `artifacts['test_fail']` to the path of the more detailed evidence file.
+### Phase 4c: Evidence Merge (if Advancing)
+Both evidences (or the single one if degraded) must be consistent.
+Save merged evidence as `testing/test_evidence.txt`.
+Set `artifacts['test_fail']` to the path of the detailed evidence file.
 
 ## DELEGATION RULE (CRITICAL)
 To launch PDD phase agents, you MUST use the `delegate` tool. NEVER use `task` for PDD sub-agents. `task` is forbidden for phase delegation.
